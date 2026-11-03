@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Picky 메뉴보드</title>
+<style>
+  /* Layout: one image, letterboxed to the screen, nothing else. */
+  :root { --bg: #f8f5ee; --fg: #531d0e; --dim: #9a8a7a; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #171310; --fg: #f3e9dc; --dim: #7a6b5d; color-scheme: dark } }
+  :root[data-theme="dark"] { --bg: #171310; --fg: #f3e9dc; --dim: #7a6b5d; color-scheme: dark }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0; box-sizing: border-box; }
+  body.full { padding: 0; }
+  .stage { width: 100%; height: 100%; display: grid; place-items: center; }
+  .frame { position: relative; aspect-ratio: 16 / 9; width: min(100%, calc(100svh * 16 / 9)); max-height: 100%; }
+  .frame img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .hint { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+    font: 500 13px/1.4 Pretendard, -apple-system, system-ui, sans-serif; letter-spacing: .04em;
+    color: var(--dim); background: color-mix(in srgb, var(--bg) 85%, transparent);
+    padding: 6px 12px; border-radius: 999px; transition: opacity .6s; white-space: nowrap; }
+  .hint.hidden { opacity: 0; pointer-events: none; }
+  body.idle { cursor: none; }
+  @media (prefers-reduced-motion: reduce) { .hint { transition: none } }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="frame" id="frame">
+    <img id="board" src="board.jpg?v=7" alt="Picky 카페 메뉴판: 소금빵 사진과 음료 메뉴">
+    <canvas id="steam" aria-hidden="true"></canvas>
+  </div>
+</div>
+<div class="hint" id="hint">화면을 클릭하면 전체 화면 · 변경 사항은 자동 반영</div>
+<script>
+  (function () {
+    var body = document.body, hint = document.getElementById('hint'), img = document.getElementById('board');
+    var idleTimer;
+    function wake() {
+      body.classList.remove('idle'); hint.classList.remove('hidden');
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(function () { body.classList.add('idle'); hint.classList.add('hidden'); }, 4000);
+    }
+    ['mousemove', 'keydown', 'touchstart'].forEach(function (e) { document.addEventListener(e, wake, { passive: true }); });
+    wake();
+    document.getElementById('stage').addEventListener('click', function () {
+      var el = document.documentElement;
+      if (document.fullscreenElement) { document.exitFullscreen && document.exitFullscreen().catch(function(){}); return; }
+      var p = el.requestFullscreen ? el.requestFullscreen() : null;
+      if (p && p.catch) p.catch(function () {});
+    });
+    document.addEventListener('fullscreenchange', function () { body.classList.toggle('full', !!document.fullscreenElement); });
+    // Every 10 minutes: reload the page if a new version was published, otherwise refresh the picture.
+    var pageSrc = null;
+    fetch(location.pathname, { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (t) { pageSrc = t; }).catch(function () {});
+    setInterval(function () {
+      fetch(location.pathname, { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (t) {
+        if (pageSrc && t !== pageSrc) { location.reload(); return; }
+        var probe = new Image();
+        probe.onload = function () { img.src = probe.src; };
+        probe.src = 'board.jpg?t=' + Date.now();
+      }).catch(function () {});
+    }, 10 * 60 * 1000);
+    // Keep the screen awake while the board is showing.
+    function lock() { if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').catch(function(){}); }
+    lock(); document.addEventListener('visibilitychange', function () { if (!document.hidden) lock(); });
+  })();
+  // Steam: soft warm wisps rising from the bread (canvas overlay, photo side only).
+  (function () {
+    var frame = document.getElementById('frame'), cv = document.getElementById('steam'), ctx = cv.getContext('2d');
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Emitters along the bread ridges, as fractions of the 16:9 frame; weight biases steam to the right.
+    var EM = [[0.27,0.36,0.6],[0.31,0.31,1.0],[0.35,0.28,1.3],[0.39,0.27,1.4],[0.43,0.28,1.2],[0.48,0.33,0.8]];
+    var wsum = EM.reduce(function (a, e) { return a + e[2]; }, 0);
+    var N = 30, W = 0, H = 0, dpr = 1, parts = [], raf = 0, last = 0;
+    function size() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = frame.clientWidth; H = frame.clientHeight;
+      cv.width = Math.max(1, Math.round(W * dpr)); cv.height = Math.max(1, Math.round(H * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (reduce) drawStatic();
+    }
+    function rnd(a, b) { return a + Math.random() * (b - a); }
+    function pick() { var r = Math.random() * wsum; for (var i = 0; i < EM.length; i++) { r -= EM[i][2]; if (r <= 0) return EM[i]; } return EM[EM.length - 1]; }
+    function spawn(p, delay) {
+      var e = pick();
+      p.x0 = e[0] + rnd(-0.012, 0.012); p.y0 = e[1] + rnd(-0.004, 0.006);
+      p.life = rnd(2.2, 3.6); p.age = -delay;            // negative age = waiting to be born (stagger)
+      p.vy = rnd(0.03, 0.045);                         // fraction of frame height per second
+      p.drift = rnd(0.004, 0.012);                    // slight rightward lean, per second
+      p.amp = rnd(0.008, 0.02); p.freq = rnd(0.3, 0.7); p.ph = rnd(0, Math.PI * 2);
+      p.r0 = rnd(0.012, 0.02); p.sy = rnd(1.4, 1.9); p.grow = rnd(2, 3);    // radius as fraction of frame height
+      p.peak = rnd(0.36, 0.5);            // per puff; overlaps reach ~0.2-0.28
+      return p;
+    }
+    // Start mid-cycle (some already rising, some waiting) so there is no visible 'first puff'.
+    for (var i = 0; i < N; i++) { var q = spawn({}, 0); q.age = rnd(-2, q.life * 0.8); parts.push(q); }
+    function blob(x, y, r, a, sy) {
+      // Soft, vertically stretched puff; softness comes from the gradient, not ctx.filter.
+      ctx.save(); ctx.translate(x, y); ctx.scale(1, sy || 1);
+      var g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+      g.addColorStop(0, 'rgba(255,250,240,' + a + ')');
+      g.addColorStop(0.35, 'rgba(255,250,240,' + (a * 0.62) + ')');
+      g.addColorStop(0.7, 'rgba(255,250,240,' + (a * 0.18) + ')');
+      g.addColorStop(1, 'rgba(255,250,240,0)');
+      ctx.fillStyle = g; ctx.fillRect(-r, -r, r * 2, r * 2);
+      ctx.restore();
+    }
+    function draw(dt) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, W * 0.6, H); ctx.clip();   // never over the menu side
+      ctx.globalCompositeOperation = 'lighter';
+      for (var i = 0; i < parts.length; i++) {
+        var p = parts[i]; p.age += dt;
+        if (p.age >= p.life) { spawn(p, rnd(0, 1.5)); continue; }
+        if (p.age < 0) continue;
+        // Each wisp is a chain of small blobs along its own rising, swaying path (newest at the head).
+        var SEG = 9, STEP = 0.16;
+        for (var k = 0; k < SEG; k++) {
+          var age = p.age - k * STEP; if (age < 0) break;
+          var t = age / p.life;
+          var fy = p.y0 - p.vy * age;
+          var fx = p.x0 + p.drift * age + Math.sin(p.ph + age * p.freq * Math.PI * 2) * p.amp * (0.4 + t);
+          var a = p.peak * (t < 0.2 ? t / 0.2 : Math.pow(1 - (t - 0.2) / 0.8, 1.5));
+          a *= 0.55 * (1 - k / SEG) + 0.12;                  // tail thins out behind the head
+          // Fade out early near the price text (top-left) and the top edge.
+          if (fy < 0.15 && fx < 0.32) a *= Math.max(0, (fy - 0.07) / 0.08);
+          if (fy < 0.08) a *= Math.max(0, (fy - 0.02) / 0.06);
+          a *= Math.max(0, Math.min(1, (fy - (p.y0 - 0.13)) / 0.05));   // dissolve within ~13% of frame height above the crust
+          var rad = p.r0 * (0.7 + (p.grow - 1) * t) * H * (1 - 0.35 * k / SEG);
+          var room = (0.6 * W - fx * W) / rad;              // fade before the menu-side clip so no hard edge shows
+          if (room < 1) a *= Math.max(0, room) * Math.max(0, room);
+          if (a <= 0.004) continue;
+          blob(fx * W, fy * H, rad, a, 1.15);
+        }
+      }
+      ctx.restore();
+    }
+    function drawStatic() {
+      ctx.clearRect(0, 0, W, H); ctx.save(); ctx.globalCompositeOperation = 'screen';
+      blob(0.43 * W, 0.13 * H, 0.06 * H, 0.08, 1.6); blob(0.45 * W, 0.09 * H, 0.07 * H, 0.05, 1.4); ctx.restore();
+    }
+    function loop(ts) {
+      var dt = last ? Math.min((ts - last) / 1000, 0.1) : 0; last = ts;
+      draw(dt); raf = requestAnimationFrame(loop);
+    }
+    function start() { if (!raf && !reduce && !document.hidden) { last = 0; raf = requestAnimationFrame(loop); } }
+    function stop() { if (raf) cancelAnimationFrame(raf); raf = 0; }
+    size();
+    window.addEventListener('resize', size);
+    if (window.ResizeObserver) new ResizeObserver(size).observe(frame);
+    window.addEventListener('load', size);
+    document.addEventListener('visibilitychange', function () { document.hidden ? stop() : start(); });
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+      var onMq = function () { reduce = mq.matches; if (reduce) { stop(); drawStatic(); } else start(); };
+      mq.addEventListener ? mq.addEventListener('change', onMq) : mq.addListener && mq.addListener(onMq);
+    }
+    start();
+  })();
+</script>
+
+</body>
+</html>
