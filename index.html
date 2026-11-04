@@ -176,22 +176,23 @@
         MENU0 = LOOP_MS + 5 * POP_STEP + 300, MENU_STEP = 160, CARET_AT = MENU0 + 3 * MENU_STEP + 160,
         CRUMB_STEP = 90, CRUMB_END = CRUMB_AT + 6 * CRUMB_STEP + 450, INTRO_MS = Math.max(CARET_AT + 3 * 400, CRUMB_END),
         GAP_MS = 20000,                  // replay 20 s after the previous intro finished
-        SWAY_AT = INTRO_MS + 6000, SWAY_MS = 2200 * 2;   // hold 6 s, rock for two cycles, hold again
+        SWAY_AT = INTRO_MS + 6000, SWAY_MS = 1600 * 3 + 9 * 140;   // hold 6 s, wave for three cycles, hold again
     var replay = 0, swayT = 0, swayAnims = [];
     // Sway: once the intro has settled, PICKY + MENU rock gently side to side for two cycles (Web Animations, so the CSS intro keyframes stay untouched).
     function sway() {
       if (reduce) return;
-      var dx = right.clientWidth * 0.004 / (2311 / 1529);   // ~0.4% of the board width
-      var els = [box].concat(Array.prototype.slice.call(right.querySelectorAll('.ml')));
-      swayAnims = els.map(function (el) {
+      // Letter by letter: P-I-C-K-Y then M-E-N-U rock in a wave, each a little behind the one before.
+      var els = Array.prototype.slice.call(box.querySelectorAll('.pl')).concat(Array.prototype.slice.call(right.querySelectorAll('.ml')));
+      var bob = right.clientHeight * 0.004;
+      swayAnims = els.map(function (el, i) {
         el.style.transformOrigin = '50% 100%';
         return el.animate([
-          { transform: 'translateX(0) rotate(0deg)' },
-          { transform: 'translateX(' + dx + 'px) rotate(1.4deg)', offset: 0.25 },
-          { transform: 'translateX(0) rotate(0deg)', offset: 0.5 },
-          { transform: 'translateX(' + (-dx) + 'px) rotate(-1.4deg)', offset: 0.75 },
-          { transform: 'translateX(0) rotate(0deg)' }
-        ], { duration: 2200, iterations: 2, easing: 'ease-in-out' });
+          { transform: 'rotate(0deg) translateY(0)' },
+          { transform: 'rotate(6deg) translateY(' + (-bob) + 'px)', offset: 0.25 },
+          { transform: 'rotate(0deg) translateY(0)', offset: 0.5 },
+          { transform: 'rotate(-6deg) translateY(' + (-bob) + 'px)', offset: 0.75 },
+          { transform: 'rotate(0deg) translateY(0)' }
+        ], { duration: 1600, iterations: 3, delay: i * 140, easing: 'ease-in-out' });
       });
     }
     var right = document.getElementById('right'), box = document.getElementById('logoBox'), cv = document.getElementById('loopCv');
