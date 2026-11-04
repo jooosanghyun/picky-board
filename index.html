@@ -60,17 +60,14 @@
     100% { opacity: 1; transform: translate(0, 0); } }
   /* "Pick!" stickers next to recommended items; left/top are fractions of the menu panel, sizes follow the board height. */
   .pick { position: absolute; margin: 0; pointer-events: none; white-space: nowrap; box-sizing: border-box;
-    height: calc(var(--fh) * 66 / 4320); line-height: calc(var(--fh) * 66 / 4320); padding: 0 0.65em; border-radius: 999px;
+    height: calc(var(--fh) * 82 / 4320); line-height: calc(var(--fh) * 82 / 4320); padding: 0 0.65em; border-radius: 999px;
     background: #531d0e; color: #fcfaf5; font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
-    font-weight: 800; font-size: calc(var(--fh) * 46 / 4320); letter-spacing: 0.01em; font-synthesis: none;
+    font-weight: 800; font-size: calc(var(--fh) * 57 / 4320); letter-spacing: 0.01em; font-synthesis: none;
     -webkit-font-smoothing: antialiased; transform-origin: 50% 50%; transform: translateY(-50%) rotate(-6deg);
-    animation: wiggle 6s ease-in-out infinite; }
-  @keyframes wiggle {
-    0%, 10%, 100% { transform: translateY(-50%) rotate(-6deg); }
-    2% { transform: translateY(-50%) rotate(-10deg); }
-    4% { transform: translateY(-50%) rotate(-2deg); }
-    6% { transform: translateY(-50%) rotate(-9deg); }
-    8% { transform: translateY(-50%) rotate(-4deg); } }
+    animation: wiggle 2.6s ease-in-out infinite; }
+  @keyframes wiggle {                      /* continuous gentle rocking around the -6deg resting tilt */
+    0%, 100% { transform: translateY(-50%) rotate(-10deg); }
+    50% { transform: translateY(-50%) rotate(-2deg); } }
   #right.intro .ml { animation: fade .09s linear both; }
   #right.intro .caret { animation: blink .4s step-end 3; }
   @keyframes pop { from { opacity: 0; transform: scale(.6) } 40% { opacity: 1 } to { opacity: 1; transform: scale(1) } }
@@ -116,7 +113,7 @@
       </ul>
     </div>
     <div id="right">
-      <img id="menu" src="menu.jpg?v=10" alt="">
+      <img id="menu" src="menu.jpg?v=11" alt="">
       <div id="logoBox" aria-hidden="true"><canvas id="loopCv"></canvas></div>
       <p class="pick" aria-hidden="true" style="left:25.997%;top:65.169%">Pick!</p>
       <p class="pick" aria-hidden="true" style="left:27.109%;top:77.414%">Pick!</p>
@@ -178,8 +175,25 @@
     var LOOP_MS = 2400, POP0 = LOOP_MS, POP_STEP = 120, CRUMB_AT = LOOP_MS + 5 * POP_STEP + 120,
         MENU0 = LOOP_MS + 5 * POP_STEP + 300, MENU_STEP = 160, CARET_AT = MENU0 + 3 * MENU_STEP + 160,
         CRUMB_STEP = 90, CRUMB_END = CRUMB_AT + 6 * CRUMB_STEP + 450, INTRO_MS = Math.max(CARET_AT + 3 * 400, CRUMB_END),
-        GAP_MS = 20000;                  // replay 20 s after the previous intro finished
-    var replay = 0;
+        GAP_MS = 20000,                  // replay 20 s after the previous intro finished
+        SWAY_AT = INTRO_MS + 6000, SWAY_MS = 2200 * 2;   // hold 6 s, rock for two cycles, hold again
+    var replay = 0, swayT = 0, swayAnims = [];
+    // Sway: once the intro has settled, PICKY + MENU rock gently side to side for two cycles (Web Animations, so the CSS intro keyframes stay untouched).
+    function sway() {
+      if (reduce) return;
+      var dx = right.clientWidth * 0.004 / (2311 / 1529);   // ~0.4% of the board width
+      var els = [box].concat(Array.prototype.slice.call(right.querySelectorAll('.ml')));
+      swayAnims = els.map(function (el) {
+        el.style.transformOrigin = '50% 100%';
+        return el.animate([
+          { transform: 'translateX(0) rotate(0deg)' },
+          { transform: 'translateX(' + dx + 'px) rotate(1.4deg)', offset: 0.25 },
+          { transform: 'translateX(0) rotate(0deg)', offset: 0.5 },
+          { transform: 'translateX(' + (-dx) + 'px) rotate(-1.4deg)', offset: 0.75 },
+          { transform: 'translateX(0) rotate(0deg)' }
+        ], { duration: 2200, iterations: 2, easing: 'ease-in-out' });
+      });
+    }
     var right = document.getElementById('right'), box = document.getElementById('logoBox'), cv = document.getElementById('loopCv');
     var ctx = cv.getContext('2d'), mask = document.createElement('canvas'), mctx = mask.getContext('2d');
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -249,12 +263,13 @@
       if (!ready) { pending = true; return; }
       if (raf) cancelAnimationFrame(raf); raf = 0;
       right.classList.remove('intro'); void right.offsetWidth;
-      clearTimeout(replay); replay = 0;
+      clearTimeout(replay); replay = 0; clearTimeout(swayT); swayAnims.forEach(function (a) { a.cancel(); }); swayAnims = [];
       if (reduce) { finished = true; paint(); return; }
       console.log('[intro] start', Math.round(performance.now()));
       mctx.clearRect(0, 0, mask.width, mask.height); done = 0; finished = false; t0 = 0; paint();
       scatter(); right.classList.add('intro');
       replay = setTimeout(play, INTRO_MS + GAP_MS);
+      swayT = setTimeout(sway, SWAY_AT);
       raf = requestAnimationFrame(tick);
     }
     var pending = false;
