@@ -4,9 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Picky 메뉴보드</title>
+<link rel="preload" href="fonts/PretendardVariable.woff2" as="font" type="font/woff2" crossorigin>
 <style>
-  /* Layout: one image, letterboxed to the screen, nothing else. */
-  :root { --bg: #f8f5ee; --fg: #531d0e; --dim: #9a8a7a; }
+  @font-face { font-family: Pretendard; font-weight: 45 920; font-style: normal; font-display: swap;
+    src: url(fonts/PretendardVariable.woff2) format('woff2-variations'), url(fonts/PretendardVariable.woff2) format('woff2'); }
+  /* Board colours: the page around the board follows the theme; the board itself is print-fixed. */
+  :root { --bg: #f8f5ee; --fg: #531d0e; --dim: #9a8a7a; --ink: #531d0e; --cream: #fcfaf5; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #171310; --fg: #f3e9dc; --dim: #7a6b5d; color-scheme: dark } }
   :root[data-theme="dark"] { --bg: #171310; --fg: #f3e9dc; --dim: #7a6b5d; color-scheme: dark }
   html, body { height: 100%; }
@@ -16,43 +19,102 @@
     padding-block: 0; box-sizing: border-box; }
   body.full { padding: 0; }
   .stage { width: 100%; height: 100%; display: grid; place-items: center; }
-  .frame { position: relative; aspect-ratio: 16 / 9; width: min(100%, calc(100svh * 16 / 9)); max-height: 100%; }
-  .frame img { width: 100%; height: 100%; object-fit: contain; display: block; }
-  .frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-  /* Photo slideshow: covers only the left photo panel (2311/3840 of the board). */
-  .slides { position: absolute; left: 0; top: 0; height: 100%; width: calc(100% * 2311 / 3840); overflow: hidden; pointer-events: none; }
+  /* --fw / --fh = frame size in px (set from JS), so every overlay scales with the board. */
+  .frame { --fw: 1920px; --fh: 1080px; position: relative; aspect-ratio: 16 / 9; width: min(100%, calc(100svh * 16 / 9)); max-height: 100%;
+    overflow: hidden; background: #fff; }
+  /* Two panels: photo (2311/3840) and menu (the rest). */
+  #left { position: absolute; left: 0; top: 0; height: 100%; width: calc(100% * 2311 / 3840); }
+  #right { position: absolute; top: 0; right: 0; height: 100%; left: calc(100% * 2311 / 3840); z-index: 2; }
+  #photo { position: absolute; left: 0; top: 0; height: 100%; width: calc(100% + 1px); display: block; }  /* 1px under the menu: no seam */
+  #menu { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #steam { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  /* Photo slideshow over the photo panel. */
+  .slides { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
   .frame .slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0;
     transition: opacity 1.6s ease; will-change: opacity, transform; transform-origin: center; }
   .frame .slide.on { opacity: 1; animation: kb 14s linear forwards; }
   @keyframes kb { from { transform: scale(1.0) } to { transform: scale(1.06) } }
-  #steam { transition: opacity 1.2s ease; }
-  body.away #steam { opacity: 0; }
-  .hint { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  /* Price caption (home slide only), same type as the menu item rows. */
+  .price { position: absolute; left: calc(var(--fw) * 460 / 3840); top: calc(var(--fh) * 95 / 2160);
+    width: calc(var(--fw) * (1150 - 460) / 3840); margin: 0; padding: 0; list-style: none;
+    font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+    font-size: calc(var(--fh) * 58 / 2160); line-height: 1.5; color: #531d0e; letter-spacing: -0.005em;
+    font-synthesis: none; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; pointer-events: none; }
+  .price li { display: flex; justify-content: space-between; align-items: baseline; white-space: nowrap; }
+  .price .n { font-weight: 500; }
+  .price .p { font-weight: 400; font-variant-numeric: tabular-nums; }
+  #steam, .price { transition: opacity 1.2s ease; }
+  body.away #steam, body.away .price { opacity: 0; }
+  /* Menu overlays: logo (drawn), PICKY letters, crumbs, MENU letters. Boxes are fractions of the menu panel. */
+  #logoBox { position: absolute; pointer-events: none; }
+  #logoBox canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .ov { position: absolute; display: block; pointer-events: none; user-select: none; }
+  .caret { position: absolute; background: #531d0e; opacity: 0; pointer-events: none; }
+  #right.intro .pl { animation: pop .38s cubic-bezier(.3,1.5,.5,1) both; }
+  #right.intro .crumbs { animation: fade .3s ease-out both; }
+  #right.intro .ml { animation: fade .09s linear both; }
+  #right.intro .caret { animation: blink .4s step-end 3; }
+  @keyframes pop { from { opacity: 0; transform: scale(.6) } 40% { opacity: 1 } to { opacity: 1; transform: scale(1) } }
+  @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes blink { 0% { opacity: 1 } 50% { opacity: 0 } }
+  /* Bottom ticker across both panels. */
+  .ticker { position: absolute; left: 0; right: 0; bottom: 0; height: 4.6%; z-index: 5; overflow: hidden;
+    background: var(--cream); border-top: max(1px, calc(var(--fh) * 2 / 1080)) solid #531d0e; box-sizing: border-box;
+    display: flex; align-items: center; pointer-events: none; }
+  .track { display: flex; align-items: center; width: max-content; will-change: transform;
+    animation: tick var(--dur, 40s) linear infinite; }
+  .track img { display: block; flex: none; }
+  .track .w { height: calc(var(--fh) * 0.046 * 0.55); margin-right: calc(var(--fh) * 0.034); }
+  .track .s { height: calc(var(--fh) * 0.046 * 0.42); margin-right: calc(var(--fh) * 0.034); }
+  @keyframes tick { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+  .hint { position: fixed; left: 50%; bottom: calc(14px + min(4.6svh, 2.6vw) + env(safe-area-inset-bottom, 0px));   /* above the ticker */ transform: translateX(-50%); z-index: 10;
     font: 500 13px/1.4 Pretendard, -apple-system, system-ui, sans-serif; letter-spacing: .04em;
     color: var(--dim); background: color-mix(in srgb, var(--bg) 85%, transparent);
     padding: 6px 12px; border-radius: 999px; transition: opacity .6s; white-space: nowrap; }
   .hint.hidden { opacity: 0; pointer-events: none; }
   body.idle { cursor: none; }
-  @media (prefers-reduced-motion: reduce) { .hint { transition: none } .frame .slide { transition-duration: 0s } .frame .slide.on { animation: none } #steam { transition: none } }
+  @media (prefers-reduced-motion: reduce) {
+    .hint { transition: none } .frame .slide { transition-duration: 0s } .frame .slide.on { animation: none }
+    #steam, .price { transition: none } .track { animation: none }
+    #right.intro .pl, #right.intro .crumbs, #right.intro .ml, #right.intro .caret { animation: none } }
 </style>
 </head>
 <body>
 <div class="stage" id="stage">
-  <div class="frame" id="frame">
-    <img id="board" src="board.jpg?v=8" alt="Picky 카페 메뉴판: 소금빵 사진과 음료 메뉴">
-    <div class="slides" id="slides" aria-hidden="true">
-      <img class="slide" src="slides/01.jpg" alt="">
-      <img class="slide" src="slides/02.jpg" alt="">
-      <img class="slide" src="slides/03.jpg" alt="">
-      <img class="slide" src="slides/04.jpg" alt="">
+  <div class="frame" id="frame" role="img" aria-label="Picky 카페 메뉴판: 소금빵 사진과 음료 메뉴">
+    <div id="left">
+      <img id="photo" src="photo.jpg?v=9" alt="">
+      <div class="slides" id="slides" aria-hidden="true">
+        <img class="slide" src="slides/01.jpg" alt="">
+        <img class="slide" src="slides/02.jpg" alt="">
+        <img class="slide" src="slides/03.jpg" alt="">
+        <img class="slide" src="slides/04.jpg" alt="">
+      </div>
+      <canvas id="steam" aria-hidden="true"></canvas>
+      <ul class="price" id="price">
+        <li><span class="n">소금빵</span><span class="p">₩2,500</span></li>
+        <li><span class="n">초코 소금빵</span><span class="p">₩3,000</span></li>
+      </ul>
     </div>
-    <canvas id="steam" aria-hidden="true"></canvas>
+    <div id="right">
+      <img id="menu" src="menu.jpg?v=9" alt="">
+      <div id="logoBox" aria-hidden="true"><canvas id="loopCv"></canvas></div>
+    </div>
+    <div class="ticker" aria-hidden="true"><div class="track" id="track"></div></div>
   </div>
 </div>
 <div class="hint" id="hint">화면을 클릭하면 전체 화면 · 변경 사항은 자동 반영</div>
 <script>
+  // Frame size as CSS variables, so text and overlays scale exactly with the board.
   (function () {
-    var body = document.body, hint = document.getElementById('hint'), img = document.getElementById('board');
+    var frame = document.getElementById('frame');
+    function setSize() { frame.style.setProperty('--fw', frame.clientWidth + 'px'); frame.style.setProperty('--fh', frame.clientHeight + 'px'); }
+    setSize();
+    window.addEventListener('resize', setSize);
+    if (window.ResizeObserver) new ResizeObserver(setSize).observe(frame);
+  })();
+  (function () {
+    var body = document.body, hint = document.getElementById('hint');
     var idleTimer;
     function wake() {
       body.classList.remove('idle'); hint.classList.remove('hidden');
@@ -68,22 +130,121 @@
       if (p && p.catch) p.catch(function () {});
     });
     document.addEventListener('fullscreenchange', function () { body.classList.toggle('full', !!document.fullscreenElement); });
-    // Every 10 minutes: reload the page if a new version was published, otherwise refresh the picture.
+    // Every 10 minutes: reload the page if a new version was published, otherwise refresh the pictures.
     var pageSrc = null;
     fetch(location.pathname, { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (t) { pageSrc = t; }).catch(function () {});
+    function refresh(id, file) {
+      var el = document.getElementById(id), probe = new Image();
+      probe.onload = function () { el.src = probe.src; };
+      probe.src = file + '?t=' + Date.now();
+    }
     setInterval(function () {
       fetch(location.pathname, { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (t) {
         if (pageSrc && t !== pageSrc) { location.reload(); return; }
-        var probe = new Image();
-        probe.onload = function () { img.src = probe.src; };
-        probe.src = 'board.jpg?t=' + Date.now();
+        refresh('photo', 'photo.jpg'); refresh('menu', 'menu.jpg');
       }).catch(function () {});
     }, 10 * 60 * 1000);
     // Keep the screen awake while the board is showing.
     function lock() { if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').catch(function(){}); }
     lock(); document.addEventListener('visibilitychange', function () { if (!document.hidden) lock(); });
   })();
-  // Slideshow on the photo panel: home (board.jpg + steam) 12 s, then each photo 7 s, looping.
+  // Menu intro: the logo loop is drawn by hand, PICKY letters pop in, crumbs fall, then MENU is typed.
+  // Boxes are fractions [x, y, w, h]; logo letters relative to the logo box, everything else relative to the menu panel.
+  window.boardIntro = (function () {
+    var LOGO = [0.29104, 0.03356, 0.41792, 0.21481], LETTERS = [[0.07825, 0.55065, 0.16901, 0.38039], [0.25743, 0.51832, 0.0759, 0.41272], [0.35446, 0.59052, 0.16667, 0.34052], [0.54304, 0.61099, 0.19875, 0.34591], [0.75117, 0.59267, 0.20501, 0.33836]], MENU = [[0.2276, 0.25556, 0.15435, 0.09884], [0.39765, 0.25556, 0.08927, 0.09884], [0.50262, 0.25556, 0.12786, 0.09884], [0.64585, 0.25556, 0.12688, 0.09884]];
+    var LOGO_PX = [1278, 928];                     // sprite size of the logo box
+    var PATH = [86,687,13,82,683,15,78,678,16,74,674,17,70,669,17,67,664,18,64,659,18,61,654,19,58,648,19,55,643,19,53,638,20,50,632,20,48,627,20,45,621,20,43,616,20,41,610,20,39,604,19,36,599,19,35,593,20,33,587,20,31,582,20,30,576,20,28,570,20,27,564,20,26,558,20,24,552,20,23,547,20,22,541,20,22,535,21,21,529,21,21,523,21,20,517,21,19,511,21,19,505,22,18,499,23,18,493,23,18,487,23,18,481,23,18,475,23,18,469,23,19,463,22,18,457,23,19,451,22,18,445,23,18,439,23,19,433,22,19,427,22,19,421,21,20,415,21,21,409,22,22,403,22,23,397,22,24,391,22,25,385,22,26,380,22,27,374,22,28,368,22,30,362,22,31,356,22,32,350,21,34,345,22,36,339,22,37,333,22,39,327,22,41,321,22,43,316,22,45,310,22,47,305,21,49,299,21,52,294,21,54,288,21,56,283,21,59,277,21,62,272,21,65,267,22,68,261,21,71,256,21,74,251,21,78,246,22,81,241,22,84,236,21,88,232,22,91,227,22,95,222,22,99,217,22,102,212,21,106,208,21,110,204,22,115,199,22,119,195,22,123,191,22,127,187,22,132,183,22,137,179,22,141,175,22,145,171,22,150,167,22,155,163,22,160,160,23,164,156,22,169,153,22,174,149,22,179,146,22,185,143,22,190,140,22,195,137,22,200,134,22,206,132,22,211,129,22,216,126,22,222,124,22,227,121,21,233,119,22,238,117,21,244,115,21,250,113,20,255,111,21,261,109,21,267,107,20,273,106,21,278,104,20,284,103,20,290,102,20,296,101,20,302,100,20,308,99,20,314,99,20,320,98,20,326,98,20,332,98,20,338,98,20,344,98,20,350,97,20,356,97,20,362,98,20,368,98,20,374,99,20,380,99,21,386,100,21,392,100,20,398,101,20,404,102,20,410,102,19,415,104,20,419,109,24,424,111,23,429,114,21,435,117,19,440,119,20,445,122,19,451,122,23,457,124,24,463,126,25,468,129,25,473,132,26,478,135,26,483,138,26,488,142,26,493,145,27,498,149,27,503,152,27,508,156,27,512,160,28,517,164,28,521,168,28,526,172,28,530,176,28,534,181,28,538,185,28,541,190,28,545,195,28,549,199,27,552,204,28,555,209,28,558,215,28,561,220,28,564,225,28,567,230,27,570,236,27,572,241,27,574,247,26,576,252,27,578,258,27,580,264,26,581,270,26,583,275,26,584,281,26,585,287,25,585,293,26,586,299,25,586,305,25,587,311,25,587,317,25,587,323,25,586,329,25,586,335,25,586,341,25,585,347,25,584,353,25,583,359,25,582,365,24,580,371,25,578,376,25,577,382,24,574,388,24,572,393,24,569,398,24,566,404,23,563,409,23,560,414,22,556,418,23,552,423,23,548,427,23,544,431,23,539,435,23,534,439,22,529,442,22,524,445,22,519,448,22,514,451,21,508,453,21,502,455,21,496,456,22,490,457,22,485,458,21,479,459,21,473,459,21,467,459,21,461,459,21,455,458,21,449,458,20,443,457,20,437,456,20,431,454,20,425,453,20,420,451,20,414,449,19,408,446,20,403,444,19,398,441,19,393,437,20,388,434,19,384,430,19,380,425,20,376,421,20,372,416,20,369,411,20,365,406,20,362,401,20,359,396,19,356,390,19,354,385,19,352,379,20,350,374,20,348,368,20,346,362,19,345,357,20,343,351,19,342,345,19,341,339,18,341,333,19,341,327,20,341,321,19,340,315,20,340,309,20,340,303,20,340,297,20,340,291,19,341,285,20,342,279,20,343,273,20,343,267,20,344,261,20,346,255,20,347,249,20,348,244,20,349,238,20,351,232,20,352,226,19,354,220,19,356,215,19,358,209,19,360,204,19,363,198,18,365,192,19,367,187,18,369,181,18,372,176,18,375,171,19,378,166,19,381,160,19,384,155,19,387,150,19,390,145,19,394,140,19,397,135,19,401,130,19,404,125,21,408,120,21,411,115,22,414,110,26,418,105,20,421,101,16,424,96,13,428,91,13,431,86,13,435,81,13,441,81,13,446,80,13,452,79,14,458,79,18,464,77,17,469,73,17,473,70,18,478,66,18,483,63,18,488,59,18,493,56,18,498,53,18,504,50,18,509,47,18,514,45,18,520,42,18,525,40,18,531,37,18,536,36,18,542,34,19,548,32,19,554,30,19,559,29,19,565,27,19,571,26,19,577,25,19,583,23,19,589,22,19,595,21,20,601,20,20,607,19,20,612,19,20,618,18,20,624,17,22,630,17,22,636,17,22,642,17,22,648,17,22,654,17,22,660,18,21,666,18,22,672,18,22,678,18,22,684,18,22,690,18,22,696,19,21,702,20,21,708,21,21,714,22,21,720,23,21,726,24,21,732,25,20,738,26,20,744,27,19,749,29,20,755,30,20,761,32,19,767,33,19,773,35,19,778,36,18,784,38,19,789,41,19,795,43,19,801,46,18,806,48,19,812,50,19,817,53,19,822,56,18,828,58,18,833,61,19,838,64,19,843,67,18,848,71,18,853,74,19,858,77,19,863,81,19,868,84,19,873,88,19,878,91,19,882,95,20,887,99,20,891,103,20,896,107,20,900,111,20,904,115,21,909,120,21,913,124,20,917,128,20,921,133,21,925,137,20,929,142,20,933,146,20,936,151,20,940,156,20,944,161,20,947,166,20,950,170,20,954,175,20,957,180,20,960,185,20,964,191,20,967,196,20,970,201,20,973,206,20,976,211,19,978,217,19,981,222,20,984,227,20,986,233,20,989,238,20,991,244,20,993,250,20,995,255,21,997,261,21,999,267,21,1000,272,21,1002,278,21,1003,284,22,1004,290,22,1005,296,22,1006,302,22,1007,308,22,1008,314,22,1009,320,24,1010,325,25,1011,331,22,1011,337,21,1012,343,19,1013,349,18,1014,355,17,1013,361,18,1011,366,19,1009,372,21,1008,378,20,1007,384,20,1007,390,21,1006,396,20,1006,402,20,1005,408,20,1004,414,20,1003,420,20,1001,426,20,1000,431,20,999,437,19,997,443,19,996,449,18,994,455,18,992,460,18,990,466,18,987,471,18,985,477,18,983,482,18,980,488,17,978,493,17,975,499,16,971,503,17,968,508,17,964,513,16,959,517,17,954,520,18,949,523,18,943,525,19,938,526,20,932,527,20,926,525,20,920,523,20,915,519,19,911,515,19,908,510,18,905,505,18,904,499,18,903,493,18,903,487,18,903,481,17,904,475,18,905,469,18,906,463,18,908,457,18,910,452,18,911,446,18,914,440,18,916,435,18,918,429,17,921,424,17,924,419,17,927,414,17,931,409,17,934,404,17,937,399,17,941,394,17,944,389,17,948,384,17,952,380,17,956,375,17,960,371,17,964,367,17,968,362,17,973,358,17,977,354,16,981,350,16,986,346,16,990,342,15,995,338,15,999,333,15,1003,329,18,1008,325,23,1012,321,22,1016,317,16,1021,313,13,1027,313,13,1032,315,13,1038,318,15,1044,318,17,1049,317,16,1055,315,16,1061,313,16,1066,311,17,1072,309,17,1078,307,17,1084,306,17,1089,305,17,1095,304,17,1101,303,16,1107,303,16,1113,303,17,1119,302,16,1125,302,16,1131,303,16,1137,304,16,1143,304,16,1149,305,16,1155,306,16,1161,307,16,1167,309,16,1172,311,16,1178,313,16,1184,315,16,1189,317,16,1194,320,17,1199,323,17,1204,327,17,1209,330,17,1214,334,17,1218,339,18,1222,343,18,1226,347,17,1230,352,17,1233,357,18,1236,362,18,1240,367,18,1243,372,17,1245,378,18,1248,383,18,1250,389,18,1252,394,18,1254,400,18,1256,406,19,1257,411,19,1259,417,18,1260,423,19,1261,429,20,1262,435,20,1262,441,20,1262,447,19,1262,453,19,1262,459,19,1262,465,17,1261,471,17,1261,477,17,1260,483,17,1259,489,17,1258,495,16,1258,501,16,1257,506,16,1256,512,16,1255,518,16,1254,524,15,1252,530,15,1250,536,16,1249,542,15,1247,547,15,1245,553,15,1242,558,15,1240,564,15,1237,569,15,1233,573,14,1229,578,13,1224,582,13];                            // flat [x, y, r, ...] along the stroke, in sprite px
+    var LOOP_MS = 2400, POP0 = LOOP_MS, POP_STEP = 120, CRUMB_AT = LOOP_MS + 5 * POP_STEP + 120,
+        MENU0 = LOOP_MS + 5 * POP_STEP + 300, MENU_STEP = 160, CARET_AT = MENU0 + 3 * MENU_STEP + 160;
+    var right = document.getElementById('right'), box = document.getElementById('logoBox'), cv = document.getElementById('loopCv');
+    var ctx = cv.getContext('2d'), mask = document.createElement('canvas'), mctx = mask.getContext('2d');
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function place(el, b) { el.style.left = b[0] * 100 + '%'; el.style.top = b[1] * 100 + '%'; el.style.width = b[2] * 100 + '%'; el.style.height = b[3] * 100 + '%'; }
+    function sprite(src, b, cls, parent, delay) {
+      var im = new Image(); im.src = src; im.alt = ''; im.className = 'ov ' + cls; place(im, b);
+      if (delay != null) im.style.animationDelay = delay + 'ms';
+      parent.appendChild(im); return im;
+    }
+    place(box, LOGO);
+    var loopImg = new Image(); loopImg.src = 'assets/logo-loop.png';
+    LETTERS.forEach(function (b, i) { sprite('assets/logo-' + i + '.png', b, 'pl', box, POP0 + i * POP_STEP); });
+    sprite('assets/logo-crumbs.png', [0, 0, 1, 1], 'crumbs', box, CRUMB_AT);
+    MENU.forEach(function (b, i) { sprite('assets/menu-' + i + '.png', b, 'ml', right, MENU0 + i * MENU_STEP); });
+    var last = MENU[MENU.length - 1], caret = document.createElement('i');
+    caret.className = 'caret'; caret.style.animationDelay = CARET_AT + 'ms';
+    place(caret, [last[0] + last[2] + 0.012, last[1] + last[3] * 0.12, 0.011, last[3] * 0.76]); right.appendChild(caret);
+
+    var N = PATH.length / 3, done = 0, t0 = 0, raf = 0, ready = false, finished = true, sx = 1, sy = 1;
+    function size() {
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var w = Math.max(1, Math.round(box.clientWidth * dpr)), h = Math.max(1, Math.round(box.clientHeight * dpr));
+      if (cv.width === w && cv.height === h) return;
+      cv.width = mask.width = w; cv.height = mask.height = h; sx = w / LOGO_PX[0]; sy = h / LOGO_PX[1];
+      // Mask was cleared by the resize: re-stamp what was already drawn.
+      var n = done; done = 0; stamp(n); paint();
+    }
+    function stamp(upto) {               // add discs [done, upto) to the mask
+      mctx.fillStyle = '#000';
+      for (var i = done; i < upto; i++) {
+        var x = PATH[i * 3] * sx, y = PATH[i * 3 + 1] * sy, r = PATH[i * 3 + 2] * sx;
+        mctx.beginPath(); mctx.arc(x, y, r, 0, 6.2832); mctx.fill();
+      }
+      done = Math.max(done, upto);
+    }
+    function paint() {
+      if (!ready) return;
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      if (finished) { ctx.drawImage(loopImg, 0, 0, cv.width, cv.height); return; }
+      ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(mask, 0, 0);
+      ctx.globalCompositeOperation = 'source-in'; ctx.drawImage(loopImg, 0, 0, cv.width, cv.height);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    function ease(t) { return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function tick(ts) {
+      if (!t0) t0 = ts;
+      var p = Math.min(1, (ts - t0) / LOOP_MS);
+      if (p >= 1) { finished = true; paint(); raf = 0; return; }
+      var upto = Math.ceil(ease(p) * N);
+      if (upto > done) { stamp(upto); paint(); }
+      raf = requestAnimationFrame(tick);
+    }
+    function play() {
+      if (!ready) { pending = true; return; }
+      if (raf) cancelAnimationFrame(raf); raf = 0;
+      right.classList.remove('intro'); void right.offsetWidth;
+      if (reduce) { finished = true; paint(); return; }
+      mctx.clearRect(0, 0, mask.width, mask.height); done = 0; finished = false; t0 = 0; paint();
+      right.classList.add('intro');
+      raf = requestAnimationFrame(tick);
+    }
+    var pending = false;
+    function onReady() { ready = true; size(); paint(); if (pending) { pending = false; play(); } }
+    if (loopImg.complete && loopImg.naturalWidth) onReady(); else loopImg.onload = onReady;
+    window.addEventListener('resize', size);
+    if (window.ResizeObserver) new ResizeObserver(size).observe(box);
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+      var onMq = function () { reduce = mq.matches; if (reduce) { if (raf) cancelAnimationFrame(raf); raf = 0; finished = true; right.classList.remove('intro'); paint(); } };
+      mq.addEventListener ? mq.addEventListener('change', onMq) : mq.addListener && mq.addListener(onMq);
+    }
+    return { play: play, timings: { loop: LOOP_MS, pop: POP0, crumbs: CRUMB_AT, menu: MENU0, caret: CARET_AT } };
+  })();
+  // Ticker: PICK WHAT YOU LOVE, repeated, two identical halves scrolled by -50% for a seamless loop.
+  (function () {
+    var frame = document.getElementById('frame'), track = document.getElementById('track');
+    var PICK = [1322, 89], MINI = [153, 84];           // sprite sizes (px)
+    // Unit width in frame-height units: word + gap + separator + gap.
+    var bandH = 0.046, unit = bandH * 0.55 * PICK[0] / PICK[1] + 0.034 + bandH * 0.42 * MINI[0] / MINI[1] + 0.034;
+    var perHalf = Math.ceil((16 / 9) / unit) + 1;
+    var html = '';
+    for (var i = 0; i < perHalf * 2; i++) html += '<img class="w" src="assets/pick-what-you-love.png" alt=""><img class="s" src="assets/loop-mini.png" alt="">';
+    track.innerHTML = html;
+    // ~90 px/s on the 3840-wide board, whatever the screen size: duration depends only on proportions.
+    var halfInFrameWidths = perHalf * unit / (16 / 9);
+    frame.style.setProperty('--dur', (halfInFrameWidths * 3840 / 90).toFixed(3) + 's');
+  })();
+  // Slideshow on the photo panel: home (photo + price + steam) 12 s, then each photo 7 s, looping.
+  // Each return to home replays the menu intro.
   (function () {
     var slides = [].slice.call(document.querySelectorAll('#slides .slide'));
     var HOME = 12000, PHOTO = 7000, idx = 0, timer = 0;   // idx 0 = home, 1..n = photos
@@ -93,6 +254,7 @@
         else el.classList.remove('on');
       });
       document.body.classList.toggle('away', i !== 0);
+      if (i === 0 && window.boardIntro) window.boardIntro.play();
     }
     function next() { idx = (idx + 1) % (slides.length + 1); show(idx); schedule(); }
     function schedule() { clearTimeout(timer); timer = setTimeout(next, idx === 0 ? HOME : PHOTO); }
@@ -101,9 +263,9 @@
     });
     show(0); if (!document.hidden) schedule();
   })();
-  // Steam: soft warm wisps rising from the bread (canvas overlay, photo side only).
+  // Steam: soft warm wisps rising from the bread (canvas over the photo panel; coordinates are fractions of the whole frame).
   (function () {
-    var frame = document.getElementById('frame'), cv = document.getElementById('steam'), ctx = cv.getContext('2d');
+    var frame = document.getElementById('frame'), left = document.getElementById('left'), cv = document.getElementById('steam'), ctx = cv.getContext('2d');
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     // Emitters along the bread ridges, as fractions of the 16:9 frame; weight biases steam to the right.
     var EM = [[0.27,0.36,0.6],[0.31,0.31,1.0],[0.35,0.28,1.3],[0.39,0.27,1.4],[0.43,0.28,1.2],[0.48,0.33,0.8]];
@@ -112,7 +274,7 @@
     function size() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       W = frame.clientWidth; H = frame.clientHeight;
-      cv.width = Math.max(1, Math.round(W * dpr)); cv.height = Math.max(1, Math.round(H * dpr));
+      cv.width = Math.max(1, Math.round(left.clientWidth * dpr)); cv.height = Math.max(1, Math.round(H * dpr));
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       if (reduce) drawStatic();
     }
