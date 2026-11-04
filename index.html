@@ -51,7 +51,26 @@
   .ov { position: absolute; display: block; pointer-events: none; user-select: none; }
   .caret { position: absolute; background: #531d0e; opacity: 0; pointer-events: none; }
   #right.intro .pl { animation: pop .38s cubic-bezier(.3,1.5,.5,1) both; }
-  #right.intro .crumbs { animation: fade .3s ease-out both; }
+  /* Salt flecks sprinkled from above: start --dx/--dy away (set per fleck from JS), fall with an ease-in, overshoot 1 frame, settle. */
+  #right.intro .crumb { animation: sprinkle .45s both; }
+  @keyframes sprinkle {
+    0% { opacity: 0; transform: translate(var(--dx), var(--dy)); animation-timing-function: cubic-bezier(.45, 0, 1, 1); }
+    33% { opacity: 1; }
+    96% { transform: translate(0, var(--os)); animation-timing-function: linear; }
+    100% { opacity: 1; transform: translate(0, 0); } }
+  /* "Pick!" stickers next to recommended items; left/top are fractions of the menu panel, sizes follow the board height. */
+  .pick { position: absolute; margin: 0; pointer-events: none; white-space: nowrap; box-sizing: border-box;
+    height: calc(var(--fh) * 66 / 4320); line-height: calc(var(--fh) * 66 / 4320); padding: 0 0.65em; border-radius: 999px;
+    background: #531d0e; color: #fcfaf5; font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
+    font-weight: 800; font-size: calc(var(--fh) * 46 / 4320); letter-spacing: 0.01em; font-synthesis: none;
+    -webkit-font-smoothing: antialiased; transform-origin: 50% 50%; transform: translateY(-50%) rotate(-6deg);
+    animation: wiggle 6s ease-in-out infinite; }
+  @keyframes wiggle {
+    0%, 10%, 100% { transform: translateY(-50%) rotate(-6deg); }
+    2% { transform: translateY(-50%) rotate(-10deg); }
+    4% { transform: translateY(-50%) rotate(-2deg); }
+    6% { transform: translateY(-50%) rotate(-9deg); }
+    8% { transform: translateY(-50%) rotate(-4deg); } }
   #right.intro .ml { animation: fade .09s linear both; }
   #right.intro .caret { animation: blink .4s step-end 3; }
   @keyframes pop { from { opacity: 0; transform: scale(.6) } 40% { opacity: 1 } to { opacity: 1; transform: scale(1) } }
@@ -65,7 +84,7 @@
     animation: tick var(--dur, 40s) linear infinite; }
   .track img { display: block; flex: none; }
   .track .w { height: calc(var(--fh) * 0.046 * 0.55); margin-right: calc(var(--fh) * 0.034); }
-  .track .s { height: calc(var(--fh) * 0.046 * 0.42); margin-right: calc(var(--fh) * 0.034); }
+  .track .s { height: calc(var(--fh) * 0.046 * 0.85); margin-right: calc(var(--fh) * 0.034); }   /* same gap on both sides as the word gap */
   @keyframes tick { from { transform: translateX(0) } to { transform: translateX(-50%) } }
   .hint { position: fixed; left: 50%; bottom: calc(14px + min(4.6svh, 2.6vw) + env(safe-area-inset-bottom, 0px));   /* above the ticker */ transform: translateX(-50%); z-index: 10;
     font: 500 13px/1.4 Pretendard, -apple-system, system-ui, sans-serif; letter-spacing: .04em;
@@ -76,7 +95,7 @@
   @media (prefers-reduced-motion: reduce) {
     .hint { transition: none } .frame .slide { transition-duration: 0s } .frame .slide.on { animation: none }
     #steam, .price { transition: none } .track { animation: none }
-    #right.intro .pl, #right.intro .crumbs, #right.intro .ml, #right.intro .caret { animation: none } }
+    #right.intro .pl, #right.intro .crumb, #right.intro .ml, #right.intro .caret, .pick { animation: none } }
 </style>
 </head>
 <body>
@@ -97,8 +116,10 @@
       </ul>
     </div>
     <div id="right">
-      <img id="menu" src="menu.jpg?v=9" alt="">
+      <img id="menu" src="menu.jpg?v=10" alt="">
       <div id="logoBox" aria-hidden="true"><canvas id="loopCv"></canvas></div>
+      <p class="pick" aria-hidden="true" style="left:25.997%;top:65.169%">Pick!</p>
+      <p class="pick" aria-hidden="true" style="left:27.109%;top:77.414%">Pick!</p>
     </div>
     <div class="ticker" aria-hidden="true"><div class="track" id="track"></div></div>
   </div>
@@ -155,7 +176,10 @@
     var LOGO_PX = [1278, 928];                     // sprite size of the logo box
     var PATH = [86,687,13,82,683,15,78,678,16,74,674,17,70,669,17,67,664,18,64,659,18,61,654,19,58,648,19,55,643,19,53,638,20,50,632,20,48,627,20,45,621,20,43,616,20,41,610,20,39,604,19,36,599,19,35,593,20,33,587,20,31,582,20,30,576,20,28,570,20,27,564,20,26,558,20,24,552,20,23,547,20,22,541,20,22,535,21,21,529,21,21,523,21,20,517,21,19,511,21,19,505,22,18,499,23,18,493,23,18,487,23,18,481,23,18,475,23,18,469,23,19,463,22,18,457,23,19,451,22,18,445,23,18,439,23,19,433,22,19,427,22,19,421,21,20,415,21,21,409,22,22,403,22,23,397,22,24,391,22,25,385,22,26,380,22,27,374,22,28,368,22,30,362,22,31,356,22,32,350,21,34,345,22,36,339,22,37,333,22,39,327,22,41,321,22,43,316,22,45,310,22,47,305,21,49,299,21,52,294,21,54,288,21,56,283,21,59,277,21,62,272,21,65,267,22,68,261,21,71,256,21,74,251,21,78,246,22,81,241,22,84,236,21,88,232,22,91,227,22,95,222,22,99,217,22,102,212,21,106,208,21,110,204,22,115,199,22,119,195,22,123,191,22,127,187,22,132,183,22,137,179,22,141,175,22,145,171,22,150,167,22,155,163,22,160,160,23,164,156,22,169,153,22,174,149,22,179,146,22,185,143,22,190,140,22,195,137,22,200,134,22,206,132,22,211,129,22,216,126,22,222,124,22,227,121,21,233,119,22,238,117,21,244,115,21,250,113,20,255,111,21,261,109,21,267,107,20,273,106,21,278,104,20,284,103,20,290,102,20,296,101,20,302,100,20,308,99,20,314,99,20,320,98,20,326,98,20,332,98,20,338,98,20,344,98,20,350,97,20,356,97,20,362,98,20,368,98,20,374,99,20,380,99,21,386,100,21,392,100,20,398,101,20,404,102,20,410,102,19,415,104,20,419,109,24,424,111,23,429,114,21,435,117,19,440,119,20,445,122,19,451,122,23,457,124,24,463,126,25,468,129,25,473,132,26,478,135,26,483,138,26,488,142,26,493,145,27,498,149,27,503,152,27,508,156,27,512,160,28,517,164,28,521,168,28,526,172,28,530,176,28,534,181,28,538,185,28,541,190,28,545,195,28,549,199,27,552,204,28,555,209,28,558,215,28,561,220,28,564,225,28,567,230,27,570,236,27,572,241,27,574,247,26,576,252,27,578,258,27,580,264,26,581,270,26,583,275,26,584,281,26,585,287,25,585,293,26,586,299,25,586,305,25,587,311,25,587,317,25,587,323,25,586,329,25,586,335,25,586,341,25,585,347,25,584,353,25,583,359,25,582,365,24,580,371,25,578,376,25,577,382,24,574,388,24,572,393,24,569,398,24,566,404,23,563,409,23,560,414,22,556,418,23,552,423,23,548,427,23,544,431,23,539,435,23,534,439,22,529,442,22,524,445,22,519,448,22,514,451,21,508,453,21,502,455,21,496,456,22,490,457,22,485,458,21,479,459,21,473,459,21,467,459,21,461,459,21,455,458,21,449,458,20,443,457,20,437,456,20,431,454,20,425,453,20,420,451,20,414,449,19,408,446,20,403,444,19,398,441,19,393,437,20,388,434,19,384,430,19,380,425,20,376,421,20,372,416,20,369,411,20,365,406,20,362,401,20,359,396,19,356,390,19,354,385,19,352,379,20,350,374,20,348,368,20,346,362,19,345,357,20,343,351,19,342,345,19,341,339,18,341,333,19,341,327,20,341,321,19,340,315,20,340,309,20,340,303,20,340,297,20,340,291,19,341,285,20,342,279,20,343,273,20,343,267,20,344,261,20,346,255,20,347,249,20,348,244,20,349,238,20,351,232,20,352,226,19,354,220,19,356,215,19,358,209,19,360,204,19,363,198,18,365,192,19,367,187,18,369,181,18,372,176,18,375,171,19,378,166,19,381,160,19,384,155,19,387,150,19,390,145,19,394,140,19,397,135,19,401,130,19,404,125,21,408,120,21,411,115,22,414,110,26,418,105,20,421,101,16,424,96,13,428,91,13,431,86,13,435,81,13,441,81,13,446,80,13,452,79,14,458,79,18,464,77,17,469,73,17,473,70,18,478,66,18,483,63,18,488,59,18,493,56,18,498,53,18,504,50,18,509,47,18,514,45,18,520,42,18,525,40,18,531,37,18,536,36,18,542,34,19,548,32,19,554,30,19,559,29,19,565,27,19,571,26,19,577,25,19,583,23,19,589,22,19,595,21,20,601,20,20,607,19,20,612,19,20,618,18,20,624,17,22,630,17,22,636,17,22,642,17,22,648,17,22,654,17,22,660,18,21,666,18,22,672,18,22,678,18,22,684,18,22,690,18,22,696,19,21,702,20,21,708,21,21,714,22,21,720,23,21,726,24,21,732,25,20,738,26,20,744,27,19,749,29,20,755,30,20,761,32,19,767,33,19,773,35,19,778,36,18,784,38,19,789,41,19,795,43,19,801,46,18,806,48,19,812,50,19,817,53,19,822,56,18,828,58,18,833,61,19,838,64,19,843,67,18,848,71,18,853,74,19,858,77,19,863,81,19,868,84,19,873,88,19,878,91,19,882,95,20,887,99,20,891,103,20,896,107,20,900,111,20,904,115,21,909,120,21,913,124,20,917,128,20,921,133,21,925,137,20,929,142,20,933,146,20,936,151,20,940,156,20,944,161,20,947,166,20,950,170,20,954,175,20,957,180,20,960,185,20,964,191,20,967,196,20,970,201,20,973,206,20,976,211,19,978,217,19,981,222,20,984,227,20,986,233,20,989,238,20,991,244,20,993,250,20,995,255,21,997,261,21,999,267,21,1000,272,21,1002,278,21,1003,284,22,1004,290,22,1005,296,22,1006,302,22,1007,308,22,1008,314,22,1009,320,24,1010,325,25,1011,331,22,1011,337,21,1012,343,19,1013,349,18,1014,355,17,1013,361,18,1011,366,19,1009,372,21,1008,378,20,1007,384,20,1007,390,21,1006,396,20,1006,402,20,1005,408,20,1004,414,20,1003,420,20,1001,426,20,1000,431,20,999,437,19,997,443,19,996,449,18,994,455,18,992,460,18,990,466,18,987,471,18,985,477,18,983,482,18,980,488,17,978,493,17,975,499,16,971,503,17,968,508,17,964,513,16,959,517,17,954,520,18,949,523,18,943,525,19,938,526,20,932,527,20,926,525,20,920,523,20,915,519,19,911,515,19,908,510,18,905,505,18,904,499,18,903,493,18,903,487,18,903,481,17,904,475,18,905,469,18,906,463,18,908,457,18,910,452,18,911,446,18,914,440,18,916,435,18,918,429,17,921,424,17,924,419,17,927,414,17,931,409,17,934,404,17,937,399,17,941,394,17,944,389,17,948,384,17,952,380,17,956,375,17,960,371,17,964,367,17,968,362,17,973,358,17,977,354,16,981,350,16,986,346,16,990,342,15,995,338,15,999,333,15,1003,329,18,1008,325,23,1012,321,22,1016,317,16,1021,313,13,1027,313,13,1032,315,13,1038,318,15,1044,318,17,1049,317,16,1055,315,16,1061,313,16,1066,311,17,1072,309,17,1078,307,17,1084,306,17,1089,305,17,1095,304,17,1101,303,16,1107,303,16,1113,303,17,1119,302,16,1125,302,16,1131,303,16,1137,304,16,1143,304,16,1149,305,16,1155,306,16,1161,307,16,1167,309,16,1172,311,16,1178,313,16,1184,315,16,1189,317,16,1194,320,17,1199,323,17,1204,327,17,1209,330,17,1214,334,17,1218,339,18,1222,343,18,1226,347,17,1230,352,17,1233,357,18,1236,362,18,1240,367,18,1243,372,17,1245,378,18,1248,383,18,1250,389,18,1252,394,18,1254,400,18,1256,406,19,1257,411,19,1259,417,18,1260,423,19,1261,429,20,1262,435,20,1262,441,20,1262,447,19,1262,453,19,1262,459,19,1262,465,17,1261,471,17,1261,477,17,1260,483,17,1259,489,17,1258,495,16,1258,501,16,1257,506,16,1256,512,16,1255,518,16,1254,524,15,1252,530,15,1250,536,16,1249,542,15,1247,547,15,1245,553,15,1242,558,15,1240,564,15,1237,569,15,1233,573,14,1229,578,13,1224,582,13];                            // flat [x, y, r, ...] along the stroke, in sprite px
     var LOOP_MS = 2400, POP0 = LOOP_MS, POP_STEP = 120, CRUMB_AT = LOOP_MS + 5 * POP_STEP + 120,
-        MENU0 = LOOP_MS + 5 * POP_STEP + 300, MENU_STEP = 160, CARET_AT = MENU0 + 3 * MENU_STEP + 160;
+        MENU0 = LOOP_MS + 5 * POP_STEP + 300, MENU_STEP = 160, CARET_AT = MENU0 + 3 * MENU_STEP + 160,
+        CRUMB_STEP = 90, CRUMB_END = CRUMB_AT + 6 * CRUMB_STEP + 450, INTRO_MS = Math.max(CARET_AT + 3 * 400, CRUMB_END),
+        GAP_MS = 20000;                  // replay 20 s after the previous intro finished
+    var replay = 0;
     var right = document.getElementById('right'), box = document.getElementById('logoBox'), cv = document.getElementById('loopCv');
     var ctx = cv.getContext('2d'), mask = document.createElement('canvas'), mctx = mask.getContext('2d');
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -168,7 +192,20 @@
     place(box, LOGO);
     var loopImg = new Image(); loopImg.src = 'assets/logo-loop.png';
     LETTERS.forEach(function (b, i) { sprite('assets/logo-' + i + '.png', b, 'pl', box, POP0 + i * POP_STEP); });
-    sprite('assets/logo-crumbs.png', [0, 0, 1, 1], 'crumbs', box, CRUMB_AT);
+    // Salt flecks (one sprite each), sprinkled in a random order from ~0.12 box heights above.
+    var CRUMBS = [[0.53521, 0.07866, 0.02191, 0.03987], [0.47653, 0.09052, 0.04225, 0.03448], [0.55008, 0.11961, 0.03756, 0.03879], [0.63772, 0.12392, 0.02504, 0.04095], [0.60955, 0.12931, 0.02739, 0.04741], [0.57277, 0.15517, 0.02113, 0.02909], [0.65571, 0.17888, 0.03208, 0.03556]];
+    var crumbEls = CRUMBS.map(function (b, i) { return sprite('assets/crumb-' + i + '.png', b, 'crumb', box); });
+    function scatter() {                 // new random order and x offsets for each replay (translate % = of the fleck's own size)
+      var order = crumbEls.map(function (_, i) { return i; });
+      for (var i = order.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = order[i]; order[i] = order[j]; order[j] = t; }
+      order.forEach(function (k, n) {
+        var el = crumbEls[k], b = CRUMBS[k];
+        el.style.animationDelay = (CRUMB_AT + n * CRUMB_STEP) + 'ms';
+        el.style.setProperty('--dy', (-0.12 / b[3] * 100).toFixed(1) + '%');
+        el.style.setProperty('--dx', ((Math.random() * 2 - 1) * 0.02 / b[2] * 100).toFixed(1) + '%');
+        el.style.setProperty('--os', (0.004 / b[3] * 100).toFixed(1) + '%');
+      });
+    }
     MENU.forEach(function (b, i) { sprite('assets/menu-' + i + '.png', b, 'ml', right, MENU0 + i * MENU_STEP); });
     var last = MENU[MENU.length - 1], caret = document.createElement('i');
     caret.className = 'caret'; caret.style.animationDelay = CARET_AT + 'ms';
@@ -212,29 +249,32 @@
       if (!ready) { pending = true; return; }
       if (raf) cancelAnimationFrame(raf); raf = 0;
       right.classList.remove('intro'); void right.offsetWidth;
+      clearTimeout(replay); replay = 0;
       if (reduce) { finished = true; paint(); return; }
+      console.log('[intro] start', Math.round(performance.now()));
       mctx.clearRect(0, 0, mask.width, mask.height); done = 0; finished = false; t0 = 0; paint();
-      right.classList.add('intro');
+      scatter(); right.classList.add('intro');
+      replay = setTimeout(play, INTRO_MS + GAP_MS);
       raf = requestAnimationFrame(tick);
     }
     var pending = false;
-    function onReady() { ready = true; size(); paint(); if (pending) { pending = false; play(); } }
+    function onReady() { ready = true; size(); paint(); pending = false; play(); }   // intro on load, then on its own timer
     if (loopImg.complete && loopImg.naturalWidth) onReady(); else loopImg.onload = onReady;
     window.addEventListener('resize', size);
     if (window.ResizeObserver) new ResizeObserver(size).observe(box);
     if (window.matchMedia) {
       var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-      var onMq = function () { reduce = mq.matches; if (reduce) { if (raf) cancelAnimationFrame(raf); raf = 0; finished = true; right.classList.remove('intro'); paint(); } };
+      var onMq = function () { reduce = mq.matches; if (reduce) { if (raf) cancelAnimationFrame(raf); raf = 0; clearTimeout(replay); replay = 0; finished = true; right.classList.remove('intro'); paint(); } else if (!replay && ready) play(); };
       mq.addEventListener ? mq.addEventListener('change', onMq) : mq.addListener && mq.addListener(onMq);
     }
-    return { play: play, timings: { loop: LOOP_MS, pop: POP0, crumbs: CRUMB_AT, menu: MENU0, caret: CARET_AT } };
+    return { play: play, timings: { loop: LOOP_MS, pop: POP0, crumbs: CRUMB_AT, menu: MENU0, caret: CARET_AT, total: INTRO_MS, gap: GAP_MS } };
   })();
   // Ticker: PICK WHAT YOU LOVE, repeated, two identical halves scrolled by -50% for a seamless loop.
   (function () {
     var frame = document.getElementById('frame'), track = document.getElementById('track');
-    var PICK = [1322, 89], MINI = [153, 84];           // sprite sizes (px)
+    var PICK = [1322, 89], MINI = [307, 168];           // sprite sizes (px)
     // Unit width in frame-height units: word + gap + separator + gap.
-    var bandH = 0.046, unit = bandH * 0.55 * PICK[0] / PICK[1] + 0.034 + bandH * 0.42 * MINI[0] / MINI[1] + 0.034;
+    var bandH = 0.046, unit = bandH * 0.55 * PICK[0] / PICK[1] + 0.034 + bandH * 0.85 * MINI[0] / MINI[1] + 0.034;
     var perHalf = Math.ceil((16 / 9) / unit) + 1;
     var html = '';
     for (var i = 0; i < perHalf * 2; i++) html += '<img class="w" src="assets/pick-what-you-love.png" alt=""><img class="s" src="assets/loop-mini.png" alt="">';
@@ -244,7 +284,6 @@
     frame.style.setProperty('--dur', (halfInFrameWidths * 3840 / 90).toFixed(3) + 's');
   })();
   // Slideshow on the photo panel: home (photo + price + steam) 12 s, then each photo 7 s, looping.
-  // Each return to home replays the menu intro.
   (function () {
     var slides = [].slice.call(document.querySelectorAll('#slides .slide'));
     var HOME = 12000, PHOTO = 7000, idx = 0, timer = 0;   // idx 0 = home, 1..n = photos
@@ -254,7 +293,6 @@
         else el.classList.remove('on');
       });
       document.body.classList.toggle('away', i !== 0);
-      if (i === 0 && window.boardIntro) window.boardIntro.play();
     }
     function next() { idx = (idx + 1) % (slides.length + 1); show(idx); schedule(); }
     function schedule() { clearTimeout(timer); timer = setTimeout(next, idx === 0 ? HOME : PHOTO); }
