@@ -69,6 +69,9 @@
   @keyframes wiggle {                      /* continuous gentle rocking around the -6deg resting tilt */
     0%, 100% { transform: translateY(-50%) rotate(-10deg); }
     50% { transform: translateY(-50%) rotate(-2deg); } }
+  /* Salt-bread box: only the brown fill rocks; its text sprite sits still on top. */
+  .bbox-fill { transform-origin: 50% 50%; animation: boxsway 3.2s ease-in-out infinite; will-change: transform; }
+  @keyframes boxsway { 0%, 100% { transform: rotate(-1deg) translateX(-0.2%) } 50% { transform: rotate(1deg) translateX(0.2%) } }
   #right.intro .ml { animation: fade .09s linear both; }
   #right.intro .caret { animation: blink .4s step-end 3; }
   @keyframes pop { from { opacity: 0; transform: scale(.6) } 40% { opacity: 1 } to { opacity: 1; transform: scale(1) } }
@@ -93,7 +96,7 @@
   @media (prefers-reduced-motion: reduce) {
     .hint { transition: none } .frame .slide { transition-duration: 0s } .frame .slide.on { animation: none }
     #steam, .price { transition: none } .track { animation: none }
-    #right.intro .pl, #right.intro .crumb, #right.intro .ml, #right.intro .caret, .pick { animation: none } }
+    #right.intro .pl, #right.intro .crumb, #right.intro .ml, #right.intro .caret, .pick, .bbox-fill { animation: none } }
 </style>
 </head>
 <body>
@@ -112,7 +115,10 @@
       <canvas id="steam" aria-hidden="true"></canvas>
     </div>
     <div id="right">
-      <img id="menu" src="menu.jpg?v=15" alt="">
+      <img id="menu" src="menu.jpg?v=16" alt="">
+      <!-- Salt-bread box: brown fill sways, cream text/bread stays still. Fractions of the menu panel (2x sprites, box bbox + 40 px). -->
+      <img class="ov bbox-fill" src="assets/bread-box-fill.png?v=1" alt="" aria-hidden="true" style="left:50.4905%;top:70.1852%;width:44.0811%;height:18.3333%">
+      <img class="ov bbox-text" src="assets/bread-box-text.png?v=1" alt="" aria-hidden="true" style="left:50.4905%;top:70.1852%;width:44.0811%;height:18.3333%">
       <div id="logoBox" aria-hidden="true"><canvas id="loopCv"></canvas></div>
       <p class="pick" aria-hidden="true" style="left:25.997%;top:65.169%">Pick!</p>
       <p class="pick" aria-hidden="true" style="left:27.109%;top:77.414%">Pick!</p>
