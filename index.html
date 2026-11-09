@@ -62,10 +62,11 @@
   /* "Pick!" stickers next to recommended items; left/top are fractions of the menu panel, sizes follow the board height. */
   .pick { position: absolute; margin: 0; pointer-events: none; white-space: nowrap; box-sizing: border-box;
     height: calc(var(--fh) * 82 / 4320); line-height: calc(var(--fh) * 82 / 4320); padding: 0 0.65em; border-radius: 999px;
-    background: #531d0e; color: #fcfaf5; font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
+    background: #e4572e; color: #fff8ee; font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
     font-weight: 800; font-size: calc(var(--fh) * 57 / 4320); letter-spacing: 0.01em; font-synthesis: none;
     -webkit-font-smoothing: antialiased; transform-origin: 50% 50%; transform: translateY(-50%) rotate(-6deg);
     animation: wiggle 2.6s ease-in-out infinite; }
+  .pick.new { background: #f4b942; color: #531d0e; }   /* NEW sticker inside the brown salt-bread box */
   @keyframes wiggle {                      /* continuous gentle rocking around the -6deg resting tilt */
     0%, 100% { transform: translateY(-50%) rotate(-10deg); }
     50% { transform: translateY(-50%) rotate(-2deg); } }
@@ -107,9 +108,8 @@
       <div class="slides" id="slides" aria-hidden="true">
         <video class="slide" src="slides/espresso.mp4?v=2" muted playsinline preload="auto" data-dur="8200"></video>
         <img class="slide" src="slides/06.jpg" alt="">
-        <img class="slide" src="slides/03.jpg?v=3" alt="">
+        <img class="slide" src="slides/07.jpg?v=1" alt="">
         <img class="slide" src="slides/05.jpg" alt="">
-        <img class="slide" src="slides/04.jpg?v=3" alt="">
         <img class="slide" src="slides/01.jpg?v=3" alt="">
         <img class="slide" src="slides/02.jpg?v=3" alt="">
       </div>
@@ -119,7 +119,9 @@
       <img id="menu" src="menu.jpg?v=16" alt="">
       <!-- Salt-bread box: brown fill sways, cream text/bread stays still. Fractions of the menu panel (2x sprites, box bbox + 40 px). -->
       <img class="ov bbox-fill" src="assets/bread-box-fill.png?v=1" alt="" aria-hidden="true" style="left:50.4905%;top:70.1852%;width:44.0811%;height:18.3333%">
-      <img class="ov bbox-text" src="assets/bread-box-text.png?v=1" alt="" aria-hidden="true" style="left:50.4905%;top:70.1852%;width:44.0811%;height:18.3333%">
+      <img class="ov bbox-text" src="assets/bread-box-text.png?v=2" alt="" aria-hidden="true" style="left:50.4905%;top:70.1852%;width:44.0811%;height:18.3333%">
+      <!-- NEW: 40 px (4320-high px) right of the 올리브 치즈 소금빵 ink (x 2152), centred on its ink (y 3652..3711); price ink starts x 2529. -->
+      <p class="pick new" aria-hidden="true" style="left:71.681%;top:85.220%">NEW</p>
       <div id="logoBox" aria-hidden="true"><canvas id="loopCv"></canvas></div>
       <p class="pick" aria-hidden="true" style="left:25.997%;top:65.169%">Pick!</p>
       <p class="pick" aria-hidden="true" style="left:27.109%;top:77.414%">Pick!</p>
