@@ -8,6 +8,7 @@
 <style>
   @font-face { font-family: Pretendard; font-weight: 45 920; font-style: normal; font-display: swap;
     src: url(fonts/PretendardVariable.woff2) format('woff2-variations'), url(fonts/PretendardVariable.woff2) format('woff2'); }
+  @font-face { font-family: 'Jua'; src: url('fonts/Jua-Regular.ttf') format('truetype'); font-display: swap; }
   /* Board colours: the page around the board follows the theme; the board itself is print-fixed. */
   :root { --bg: #f8f5ee; --fg: #531d0e; --dim: #9a8a7a; --ink: #531d0e; --cream: #fcfaf5; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #171310; --fg: #f3e9dc; --dim: #7a6b5d; color-scheme: dark } }
@@ -87,6 +88,8 @@
   .track img { display: block; flex: none; }
   .track .w { height: calc(var(--fh) * 0.046 * 0.55); margin-right: calc(var(--fh) * 0.034); }
   .track .s { height: calc(var(--fh) * 0.046 * 0.85); margin-right: calc(var(--fh) * 0.034); }   /* same gap on both sides as the word gap */
+  .track .t { flex: none; white-space: nowrap; font: 400 calc(var(--fh) * 0.046 * 0.74) / 1 'Jua', Pretendard, sans-serif; color: #531d0e; margin-right: calc(var(--fh) * 0.034); letter-spacing: 0.01em; padding-top: 0.04em; }
+  .track .t b { font-weight: 400; color: #e4572e; }
   @keyframes tick { from { transform: translateX(0) } to { transform: translateX(-50%) } }
   .hint { position: fixed; left: 50%; bottom: calc(14px + min(4.6svh, 2.6vw) + env(safe-area-inset-bottom, 0px));   /* above the ticker */ transform: translateX(-50%); z-index: 10;
     font: 500 13px/1.4 Pretendard, -apple-system, system-ui, sans-serif; letter-spacing: .04em;
@@ -294,19 +297,28 @@
     }
     return { play: play, timings: { loop: LOOP_MS, pop: POP0, crumbs: CRUMB_AT, menu: MENU0, caret: CARET_AT, total: INTRO_MS, gap: GAP_MS } };
   })();
-  // Ticker: PICK WHAT YOU LOVE, repeated, two identical halves scrolled by -50% for a seamless loop.
+  // Ticker: PICK WHAT YOU LOVE + two notices, repeated; two identical halves scrolled by -50% for a seamless loop.
   (function () {
     var frame = document.getElementById('frame'), track = document.getElementById('track');
-    var PICK = [1322, 89], MINI = [307, 168];           // sprite sizes (px)
-    // Unit width in frame-height units: word + gap + separator + gap.
-    var bandH = 0.046, unit = bandH * 0.55 * PICK[0] / PICK[1] + 0.034 + bandH * 0.85 * MINI[0] / MINI[1] + 0.034;
-    var perHalf = Math.ceil((16 / 9) / unit) + 1;
-    var html = '';
-    for (var i = 0; i < perHalf * 2; i++) html += '<img class="w" src="assets/pick-what-you-love.png" alt=""><img class="s" src="assets/loop-mini.png" alt="">';
-    track.innerHTML = html;
-    // ~90 px/s on the 3840-wide board, whatever the screen size: duration depends only on proportions.
-    var halfInFrameWidths = perHalf * unit / (16 / 9);
-    frame.style.setProperty('--dur', (halfInFrameWidths * 3840 / 90).toFixed(3) + 's');
+    var SEP = '<img class="s" src="assets/loop-mini.png" alt="">';
+    var GROUP = '<img class="w" src="assets/pick-what-you-love.png" alt="">' + SEP +
+                '<span class="t"><b>@cafe.picky</b> 인스타그램 오픈!</span>' + SEP +
+                '<span class="t">토요일에는 소금빵을 예약제로 만나보세요</span>' + SEP;
+    function build() {
+      track.style.animation = 'none';
+      track.innerHTML = GROUP;
+      var fw = frame.clientWidth || 1, gw = track.getBoundingClientRect().width || 1;
+      var n = Math.ceil(fw / gw) + 1, half = '';
+      for (var i = 0; i < n; i++) half += GROUP;
+      track.innerHTML = half + half;
+      var halfPx = track.getBoundingClientRect().width / 2;
+      // ~90 px/s on the 3840-wide board, whatever the screen size.
+      frame.style.setProperty('--dur', (halfPx / (90 * fw / 3840)).toFixed(3) + 's');
+      track.style.animation = '';
+    }
+    build();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(build);
+    var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(build, 200); });
   })();
   // Slideshow on the photo panel: home (photo + price + steam) 12 s, then each photo 7 s, looping.
   (function () {
